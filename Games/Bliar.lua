@@ -50,8 +50,273 @@ local Success, Result = pcall(function()
 	repeat task.wait(.1) until RStorage["LoadingFinished"].Value;
 	task.wait(5);
 
-	local Utility = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/MODULES/refs/heads/master/UtilityModule.lua"))()
-	local BlairData = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/DATAS/refs/heads/master/Blair/BlairData.lua"))()
+	local Utility = (function()
+--// UTILITY MODULE
+local Utility = {
+	Threads = {},
+	AllIDs = {},
+	FoundAnything = "",
+	ActualHour = os.date("!*t").hour,
+}
+do
+	function Utility:Instance(Name, Data)
+		local Object = Instance.new(Name, Data.Parent);
+		for Index, Value in next, Data do
+			if Index ~= "Parent" then
+				if typeof(Value) == "Instance" then Value.Parent = Object;
+				else Object[Index] = Value; end
+			end
+		end
+		return Object;
+	end
+	
+	function Utility:CommaValue(Text:string)
+		local Value = Text;
+		while true do
+			local Str, Num = string.gsub(Value, "^(-?%d+)(%d%d%d)", "%1,%2");
+			Value = Str
+			if Num ~= 0 then else break end
+		end
+		return Value
+	end
+
+	function Utility:CombineTable(...:{any})
+		local newTable = {}
+		for _, v in ipairs({...}) do
+			for i, x in ipairs(v) do
+				table.insert(newTable, x)
+			end
+		end
+		return newTable
+	end
+
+	function Utility:GetTableKeys(Table:{any})
+		local newTable = {}
+		for k, _ in pairs(Table) do table.insert(newTable, k) end
+		return newTable
+	end
+	
+	function Utility:Length(Table:{any})
+		local Counter = 0
+		for _, v in pairs(Table) do Counter += 1; end
+		return Counter
+	end
+
+	function Utility:Show(UIObjects:{GuiObject}, Visible:boolean)
+		for Index, Value in pairs(UIObjects) do
+			Value.Visible = Visible
+		end
+	end
+	
+	function Utility:SaveConfig(Config:{any}, Directory:string, File:string)
+		local HttpService = game:GetService("HttpService")
+		if not isfolder(Directory) then
+			local Folders = Directory:split("/")
+			local tempDirectory = Folders[1]
+			for _, folder in pairs(Folders) do
+				if folder == tempDirectory then makefolder(folder); continue; end
+				tempDirectory = tempDirectory .. "/" .. folder
+				makefolder(tempDirectory)
+			end
+		end
+
+		writefile(Directory .. "/" .. File, HttpService:JSONEncode(Config))
+		return self:LoadConfig(Config, Directory, File)
+	end
+
+	function Utility:LoadConfig(Config:{any}, Directory:string, File:string)
+		local Success, Response = pcall(function()
+			local HttpService = game:GetService("HttpService")
+			if not isfolder(Directory) then
+				local Folders = Directory:split("/")
+				local tempDirectory = Folders[1]
+				for _, folder in pairs(Folders) do
+					if folder == tempDirectory then makefolder(folder); continue; end
+					tempDirectory = tempDirectory .. "/" .. folder
+					makefolder(tempDirectory)
+				end
+			end
+
+			return HttpService:JSONDecode(readfile(Directory .. "/" .. File))
+		end)
+
+		if Success then return Response
+		else return self:SaveConfig(Config, Directory, File) end
+	end
+
+	function Utility:GetFiles(Directory:string)
+		if not isfolder(Directory) then makefolder(Directory) end
+		return listfiles(Directory)
+	end
+	
+	function Utility:Thread(ID:string, Callback)
+		local Thread = coroutine.create(Callback)
+		self.Threads[ID] = Thread
+
+		return setmetatable({
+			ID = ID,
+			Thread = Thread,
+			Start = function() coroutine.resume(Thread); end,
+			Stop = function() coroutine.close(Thread); end,
+			Status = function() return coroutine.status(Thread) end,
+		}, {})
+	end
+
+	function Utility:StopAllThreads()
+		for i, v in pairs(self.Threads) do
+			if coroutine.status(v) == "running" then
+				coroutine.close(v)
+			end
+			self.Threads = {}
+		end
+	end
+
+	function Utility:Teleporter(PlaceID)
+		local Deleted = false
+    	local Last
+		local ServerFile = pcall(function() Utility.AllIDs = game:GetService('HttpService'):JSONDecode(readfile("NotSameServers.json")) end)
+		if not ServerFile then
+			table.insert(Utility.AllIDs, Utility.ActualHour)
+			writefile("NotSameServers.json", game:GetService('HttpService'):JSONEncode(Utility.AllIDs))
+		end
+
+		local Site;
+		if Utility.FoundAnything == "" then
+			Site = game.HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100'))
+        else
+			Site = game.HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100&cursor=' .. Utility.FoundAnything))
+		end
+
+		local ID = ""
+        if Site.nextPageCursor and Site.nextPageCursor ~= "null" and Site.nextPageCursor ~= nil then
+			Utility.FoundAnything = Site.nextPageCursor
+		end
+
+		local Num = 0;
+        local ExtraNum = 0
+		for Index, Server in pairs(Site.data) do
+            ExtraNum += 1
+            local Possible = true
+            ID = tostring(Server.id)
+            if tonumber(Server.maxPlayers) > tonumber(Server.playing) then
+                if ExtraNum ~= 1 and tonumber(Server.playing) < Last or ExtraNum == 1 then Last = tonumber(Server.playing)
+                elseif ExtraNum ~= 1 then continue end
+
+                for _, Existing in pairs(Utility.AllIDs) do
+                    if Num ~= 0 then
+                        if ID == tostring(Existing) then Possible = false end
+                    else
+                        if tonumber(Utility.ActualHour) ~= tonumber(Existing) then
+                            local delFile = pcall(function()
+                                delfile("NotSameServers.json")
+                                Utility.AllIDs = {}
+                                table.insert(Utility.AllIDs, Utility.ActualHour)
+                            end)
+                        end
+                    end
+                    Num = Num + 1
+                end
+                if Possible == true then
+                    table.insert(Utility.AllIDs, ID)
+                    task.wait()
+                    pcall(function()
+                        writefile("NotSameServers.json", game:GetService('HttpService'):JSONEncode(Utility.AllIDs))
+                        task.wait()
+                        game:GetService("TeleportService"):TeleportToPlaceInstance(PlaceID, ID, game.Players.LocalPlayer)
+                    end)
+                    task.wait(4)
+                end
+            end
+        end
+	end
+
+end
+return Utility
+end)()
+	local BlairData = (function()
+--// DATA MODULE
+return {
+    ["Ghost Type"] = {
+        ["Banshee"] = {
+            ["Evidence"] = {"EMF Level 5","SLS Anomaly","Freezing Temp."};
+        };
+        ["Demon"] = {
+            ["Evidence"] = {"Freezing Temp.","Ghost Writing","Spirit Box"};
+        };
+        ["Faejkur"] = {
+            ["Evidence"] = {"EMF Level 5","Freezing Temp.","Ghost Writing"};
+        };
+        ["Harrow"] = {
+            ["Evidence"] = {"SLS Anomaly","Ghost Orb","Ghost Writing"};
+        };
+        ["Lament"] = {
+            ["Evidence"] = {"Ghost Orb","EMF Level 5","Spirit Box"};
+        };
+        ["Mare"] = {
+            ["Evidence"] = {"Freezing Temp.","SLS Anomaly","Spirit Box"};
+        };
+        ["Nook"] = {
+            ["Evidence"] = {"EMF Level 5","Freezing Temp.","Ghost Orb"};
+        };
+        ["Poltergeist"] = {
+            ["Evidence"] = {"Ultraviolet","Ghost Orb","Spirit Box"};
+        };
+        ["Revenant"] = {
+            ["Evidence"] = {"EMF Level 5","Ultraviolet","Ghost Writing"};
+        };
+        ["Shade"] = {
+            ["Evidence"] = {"EMF Level 5","SLS Anomaly","Ghost Writing"};
+        };
+        ["Spirit"] = {
+            ["Evidence"] = {"Ultraviolet","Ghost Writing","Spirit Box"};
+        };
+        ["Strigoi"] = {
+            ["Evidence"] = {"Ultraviolet","Ghost Orb","EMF Level 5"};
+        };
+        ["Vuult"] = {
+            ["Evidence"] = {"EMF Level 5","Ghost Orb","SLS Anomaly"};
+        };
+        ["Wraith"] = {
+            ["Evidence"] = {"Freezing Temp.","Ghost Orb","SLS Anomaly"};
+        };
+        ["Yama"] = {
+            ["Evidence"] = {"Ghost Writing","Spirit Box","SLS Anomaly"};
+        };
+        ["Yurei"] = {
+            ["Evidence"] = {"Ultraviolet","Freezing Temp.","Spirit Box"};
+        };
+        ["Zozo"] = {
+            ["Evidence"] = {"EMF Level 5","Ultraviolet","Spirit Box"};
+        };
+    };
+    ["Map"] = {
+
+    };
+    ["Items"] = {
+        ["Incense Burner"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Lighter"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Crucifix"] = {Parent = game.Workspace["Map"]["Items"]};
+		["Flashlight"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Strong Flashlight"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["UV Light"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["GlowStick"] = {Parent = game.Workspace["Map"]["Items"]};
+		["Photo Camera"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Video Camera"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Trail Camera"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["SLS Camera"] = {Parent = game.Workspace["Map"]["Items"]};
+		["EMF Reader"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Thermometer"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Spirit Box"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Ghost Writing Book"] = {Parent = game.Workspace["Map"]["Items"]};
+		["Parabolic Microphone"] = {Parent = game.Workspace["Map"]["Items"]};
+        ["Salt"] = {Parent = game.Workspace["Map"]["Items"]};
+		["Sanity Soda"] = {Parent = game.Workspace["Map"]["Items"]};
+    };
+    ["Events"] = {
+        ["Easter"] = DateTime.now().UnixTimestampMillis <= DateTime.fromLocalTime(2025, 5, 2, 12, 0, 0, 0).UnixTimestampMillis;
+    }
+}
+end)()
 	
 	------------------
 	-- [[ CONFIG ]] --
@@ -566,7 +831,544 @@ local Success, Result = pcall(function()
 	----------------------
 	-- [[ INITIALIZE ]] --
 	----------------------
-	local FreecamModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/MODULES/refs/heads/master/FreecamModule.lua"))()
+	local FreecamModule = (function()
+--// FREECAM MODULE
+local Freecam = {
+	Enabled = false;
+	INPUT_PRIORITY = Enum.ContextActionPriority.High.Value;
+
+	NAV_GAIN = Vector3.new(1, 1, 1) * 64;
+	PAN_GAIN = Vector2.new(0.75, 1) * 8;
+	FOV_GAIN = 300;
+
+	PITCH_LIMIT = math.rad(90);
+
+	VEL_STIFFNESS = 1.5;
+	PAN_STIFFNESS = 1.0;
+	FOV_STIFFNESS = 4.0;
+	
+	IgnoreGUI = {};
+}
+
+------------------------------------------------------------------------
+-- Freecam
+-- Cinematic free camera for spectating and video production.
+------------------------------------------------------------------------
+
+local pi    = math.pi
+local abs   = math.abs
+local clamp = math.clamp
+local exp   = math.exp
+local rad   = math.rad
+local sign  = math.sign
+local sqrt  = math.sqrt
+local tan   = math.tan
+
+local ContextActionService	= game:GetService("ContextActionService")
+local Players				= game:GetService("Players")
+local RunService			= game:GetService("RunService")
+local StarterGui			= game:GetService("StarterGui")
+local UserInputService		= game:GetService("UserInputService")
+local GuiService			= game:GetService("GuiService")
+local Workspace				= game:GetService("Workspace")
+
+local Utility				= Utility
+
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then
+	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+	LocalPlayer = Players.LocalPlayer
+end
+
+local Camera = Workspace.CurrentCamera
+Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	local newCamera = Workspace.CurrentCamera
+	if newCamera then
+		Camera = newCamera
+	end
+end)
+
+------------------------------------------------------------------------
+
+local GUI = {} do
+	local function Create(Name, Data)
+		local Object = Instance.new(Name, Data.Parent);
+		for Index, Value in next, Data do
+			if Index ~= "Parent" then
+				if typeof(Value) == "Instance" then Value.Parent = Object;
+				else Object[Index] = Value; end
+			end
+		end
+		return Object;
+	end
+	
+	GUI.UI = Utility:Instance("ScreenGui", {
+		Name = "MobileFreecam";
+		Parent = LocalPlayer.PlayerGui;
+		Enabled = false;
+		Utility:Instance("Frame", {
+			Name = "Controls";
+			BackgroundTransparency = 1;
+			Position = UDim2.new(0, 35, 1, -179);
+			Size = UDim2.new(0, 155, 0, 155);
+		});
+	});
+	GUI.Forward = Utility:Instance("Frame", {
+		Parent = GUI.UI["Controls"];
+		BackgroundTransparency = 0.82;
+		Position = UDim2.new(0.333, 0, 0, 0);
+		Size = UDim2.new(0.333, 0, 0.333, 0);
+		Utility:Instance("UICorner", { CornerRadius = UDim.new(0, 4); });
+		Utility:Instance("TextButton", { BackgroundTransparency = 1; Size = UDim2.new(1, 0, 1, 0); Text = ""; });
+		Utility:Instance("TextLabel", { BackgroundTransparency = 1; Rotation = 90; Size = UDim2.new(1, 0, 1, 0); Font = Enum.Font.FredokaOne; Text = "<"; TextScaled = true; TextStrokeTransparency = 0.8; })
+	});
+	GUI.Backward = Utility:Instance("Frame", {
+		Parent = GUI.UI["Controls"];
+		BackgroundTransparency = 0.82;
+		Position = UDim2.new(0.333, 0, 0.667, 0);
+		Size = UDim2.new(0.333, 0, 0.333, 0);
+		Utility:Instance("UICorner", { CornerRadius = UDim.new(0, 4); });
+		Utility:Instance("TextButton", { BackgroundTransparency = 1; Size = UDim2.new(1, 0, 1, 0); Text = ""; });
+		Utility:Instance("TextLabel", { BackgroundTransparency = 1; Rotation = -90; Size = UDim2.new(1, 0, 1, 0); Font = Enum.Font.FredokaOne; Text = "<"; TextScaled = true; TextStrokeTransparency = 0.8; })
+	});
+	GUI.Left = Utility:Instance("Frame", {
+		Parent = GUI.UI["Controls"];
+		BackgroundTransparency = 0.82;
+		Position = UDim2.new(0, 0, 0.333, 0);
+		Size = UDim2.new(0.333, 0, 0.333, 0);
+		Utility:Instance("UICorner", { CornerRadius = UDim.new(0, 4); });
+		Utility:Instance("TextButton", { BackgroundTransparency = 1; Size = UDim2.new(1, 0, 1, 0); Text = ""; });
+		Utility:Instance("TextLabel", { BackgroundTransparency = 1; Rotation = 0; Size = UDim2.new(1, 0, 1, 0); Font = Enum.Font.FredokaOne; Text = "<"; TextScaled = true; TextStrokeTransparency = 0.8; })
+	});
+	GUI.Right = Utility:Instance("Frame", {
+		Parent = GUI.UI["Controls"];
+		BackgroundTransparency = 0.82;
+		Position = UDim2.new(0.667, 0, 0.333, 0);
+		Size = UDim2.new(0.333, 0, 0.333, 0);
+		Utility:Instance("UICorner", { CornerRadius = UDim.new(0, 4); });
+		Utility:Instance("TextButton", { BackgroundTransparency = 1; Size = UDim2.new(1, 0, 1, 0); Text = ""; });
+		Utility:Instance("TextLabel", { BackgroundTransparency = 1; Rotation = 180; Size = UDim2.new(1, 0, 1, 0); Font = Enum.Font.FredokaOne; Text = "<"; TextScaled = true; TextStrokeTransparency = 0.8; })
+	});
+	
+	if LocalPlayer.PlayerGui:FindFirstChild("TouchGui") then
+		local TouchGUI = LocalPlayer.PlayerGui["TouchGui"];
+		function GUI:Show() GUI.UI.Enabled = true; TouchGUI.Parent = nil end
+		function GUI:Hide() GUI.UI.Enabled = false; TouchGUI.Parent = LocalPlayer.PlayerGui; end
+	end
+end
+
+------------------------------------------------------------------------
+
+local Spring = {} do
+	Spring.__index = Spring
+
+	function Spring.new(freq, pos)
+		local self = setmetatable({}, Spring)
+		self.f = freq
+		self.p = pos
+		self.v = pos*0
+		return self
+	end
+
+	function Spring:Update(dt, goal)
+		local f = self.f*2*pi
+		local p0 = self.p
+		local v0 = self.v
+
+		local offset = goal - p0
+		local decay = exp(-f*dt)
+
+		local p1 = goal + (v0*dt - offset*(f*dt + 1))*decay
+		local v1 = (f*dt*(offset*f - v0) + v0)*decay
+
+		self.p = p1
+		self.v = v1
+
+		return p1
+	end
+
+	function Spring:Reset(pos)
+		self.p = pos
+		self.v = pos*0
+	end
+end
+
+------------------------------------------------------------------------
+
+local cameraPos = Vector3.new()
+local cameraRot = Vector2.new()
+local cameraFov = 0
+
+local velSpring = Spring.new(Freecam.VEL_STIFFNESS, Vector3.new())
+local panSpring = Spring.new(Freecam.PAN_STIFFNESS, Vector2.new())
+local fovSpring = Spring.new(Freecam.FOV_STIFFNESS, 0)
+
+------------------------------------------------------------------------
+
+local Input = {} do
+	local thumbstickCurve do
+		local K_CURVATURE = 2.0
+		local K_DEADZONE = 0.15
+
+		local function fCurve(x)
+			return (exp(K_CURVATURE*x) - 1)/(exp(K_CURVATURE) - 1)
+		end
+
+		local function fDeadzone(x)
+			return fCurve((x - K_DEADZONE)/(1 - K_DEADZONE))
+		end
+
+		function thumbstickCurve(x)
+			return sign(x)*clamp(fDeadzone(abs(x)), 0, 1)
+		end
+	end
+
+	local gamepad = {
+		ButtonX = 0,
+		ButtonY = 0,
+		DPadDown = 0,
+		DPadUp = 0,
+		ButtonL2 = 0,
+		ButtonR2 = 0,
+		Thumbstick1 = Vector2.new(),
+		Thumbstick2 = Vector2.new(),
+	}
+
+	local keyboard = {
+		W = 0,
+		A = 0,
+		S = 0,
+		D = 0,
+		E = 0,
+		Q = 0,
+		Up = 0,
+		Down = 0,
+		LeftShift = 0,
+		RightShift = 0,
+	}
+
+	local mouse = {
+		Delta = Vector2.new(),
+		MouseWheel = 0,
+	}
+
+	local NAV_GAMEPAD_SPEED  = Vector3.new(1, 1, 1)
+	local NAV_KEYBOARD_SPEED = Vector3.new(1, 1, 1)
+	local PAN_MOUSE_SPEED    = Vector2.new(1, 1)*(pi/64)
+	local PAN_GAMEPAD_SPEED  = Vector2.new(1, 1)*(pi/8)
+	local FOV_WHEEL_SPEED    = 1.0
+	local FOV_GAMEPAD_SPEED  = 0.25
+	local NAV_ADJ_SPEED      = 0.75
+	local NAV_SHIFT_MUL      = 0.25
+
+	local navSpeed = 1
+
+	function Input.Vel(dt)
+		navSpeed = clamp(navSpeed + dt*(keyboard.Up - keyboard.Down)*NAV_ADJ_SPEED, 0.01, 4)
+
+		local kGamepad = Vector3.new(
+			thumbstickCurve(gamepad.Thumbstick1.X),
+			thumbstickCurve(gamepad.ButtonR2) - thumbstickCurve(gamepad.ButtonL2),
+			thumbstickCurve(-gamepad.Thumbstick1.Y)
+		)*NAV_GAMEPAD_SPEED
+
+		local kKeyboard = Vector3.new(
+			keyboard.D - keyboard.A,
+			keyboard.E - keyboard.Q,
+			keyboard.S - keyboard.W
+		)*NAV_KEYBOARD_SPEED
+
+		local shift = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+
+		return (kGamepad + kKeyboard)*(navSpeed*(shift and NAV_SHIFT_MUL or 1))
+	end
+
+	function Input.Pan(dt)
+		if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and not UserInputService.MouseEnabled
+			and not UserInputService.GamepadEnabled and not GuiService:IsTenFootInterface() then
+			local x = -UserInputService:GetMouseDelta().X
+			local y = -UserInputService:GetMouseDelta().Y
+			local delta = Vector2.new(y, x)
+			mouse.Delta = delta
+		end
+		local kGamepad = Vector2.new(
+			thumbstickCurve(gamepad.Thumbstick2.Y),
+			thumbstickCurve(-gamepad.Thumbstick2.X)
+		)*PAN_GAMEPAD_SPEED
+		local kMouse = mouse.Delta*PAN_MOUSE_SPEED
+		mouse.Delta = Vector2.new()
+		return kGamepad + kMouse
+	end
+
+	function Input.Fov(dt)
+		local kGamepad = (gamepad.ButtonX - gamepad.ButtonY)*FOV_GAMEPAD_SPEED
+		local kMouse = mouse.MouseWheel*FOV_WHEEL_SPEED
+		mouse.MouseWheel = 0
+		return kGamepad + kMouse
+	end
+
+	do
+		local function Keypress(action, state, input)
+			keyboard[input.KeyCode.Name] = state == Enum.UserInputState.Begin and 1 or 0
+			return Enum.ContextActionResult.Sink
+		end
+
+		local function GpButton(action, state, input)
+			gamepad[input.KeyCode.Name] = state == Enum.UserInputState.Begin and 1 or 0
+			return Enum.ContextActionResult.Sink
+		end
+
+		local function MousePan(action, state, input)
+			local delta = input.Delta
+			mouse.Delta = Vector2.new(-delta.y, -delta.x)
+			return Enum.ContextActionResult.Sink
+		end
+
+		local function Thumb(action, state, input)
+			gamepad[input.KeyCode.Name] = input.Position
+			return Enum.ContextActionResult.Sink
+		end
+
+		local function Trigger(action, state, input)
+			gamepad[input.KeyCode.Name] = input.Position.z
+			return Enum.ContextActionResult.Sink
+		end
+
+		local function MouseWheel(action, state, input)
+			mouse[input.UserInputType.Name] = -input.Position.z
+			return Enum.ContextActionResult.Sink
+		end
+
+		local function Zero(t)
+			for k, v in pairs(t) do
+				t[k] = v*0
+			end
+		end
+
+		function Input.StartCapture()
+			ContextActionService:BindActionAtPriority("FreecamKeyboard", Keypress, false, Freecam.INPUT_PRIORITY,
+				Enum.KeyCode.W,
+				Enum.KeyCode.A,
+				Enum.KeyCode.S,
+				Enum.KeyCode.D,
+				Enum.KeyCode.E,
+				Enum.KeyCode.Q,
+				Enum.KeyCode.Up, Enum.KeyCode.Down
+			)
+			ContextActionService:BindActionAtPriority("FreecamMousePan",          MousePan,   false, Freecam.INPUT_PRIORITY, Enum.UserInputType.MouseMovement)
+			ContextActionService:BindActionAtPriority("FreecamMouseWheel",        MouseWheel, false, Freecam.INPUT_PRIORITY, Enum.UserInputType.MouseWheel)
+			ContextActionService:BindActionAtPriority("FreecamGamepadButton",     GpButton,   false, Freecam.INPUT_PRIORITY, Enum.KeyCode.ButtonX, Enum.KeyCode.ButtonY)
+			ContextActionService:BindActionAtPriority("FreecamGamepadTrigger",    Trigger,    false, Freecam.INPUT_PRIORITY, Enum.KeyCode.ButtonR2, Enum.KeyCode.ButtonL2)
+			ContextActionService:BindActionAtPriority("FreecamGamepadThumbstick", Thumb,      false, Freecam.INPUT_PRIORITY, Enum.KeyCode.Thumbstick1, Enum.KeyCode.Thumbstick2)
+		end
+
+		function Input.StopCapture()
+			navSpeed = 1
+			Zero(gamepad)
+			Zero(keyboard)
+			Zero(mouse)
+			ContextActionService:UnbindAction("FreecamKeyboard")
+			ContextActionService:UnbindAction("FreecamMousePan")
+			ContextActionService:UnbindAction("FreecamMouseWheel")
+			ContextActionService:UnbindAction("FreecamGamepadButton")
+			ContextActionService:UnbindAction("FreecamGamepadTrigger")
+			ContextActionService:UnbindAction("FreecamGamepadThumbstick")
+		end
+		
+		GUI.Forward.TextButton.MouseButton1Down:Connect(function() keyboard["W"] = 1; end)
+		GUI.Forward.TextButton.MouseLeave:Connect(function() keyboard["W"] = 0; end)
+		GUI.Backward.TextButton.MouseButton1Down:Connect(function() keyboard["S"] = 1; end)
+		GUI.Backward.TextButton.MouseLeave:Connect(function() keyboard["S"] = 0; end)
+		GUI.Left.TextButton.MouseButton1Down:Connect(function() keyboard["A"] = 1; end)
+		GUI.Left.TextButton.MouseLeave:Connect(function() keyboard["A"] = 0; end)
+		GUI.Right.TextButton.MouseButton1Down:Connect(function() keyboard["D"] = 1; end)
+		GUI.Right.TextButton.MouseLeave:Connect(function() keyboard["D"] = 0; end)
+	end
+end
+
+local function GetFocusDistance(cameraFrame)
+	local znear = 0.1
+	local viewport = Camera.ViewportSize
+	local projy = 2*tan(cameraFov/2)
+	local projx = viewport.x/viewport.y*projy
+	local fx = cameraFrame.rightVector
+	local fy = cameraFrame.upVector
+	local fz = cameraFrame.lookVector
+
+	local minVect = Vector3.new()
+	local minDist = 512
+
+	for x = 0, 1, 0.5 do
+		for y = 0, 1, 0.5 do
+			local cx = (x - 0.5)*projx
+			local cy = (y - 0.5)*projy
+			local offset = fx*cx - fy*cy + fz
+			local origin = cameraFrame.p + offset*znear
+			local _, hit = Workspace:FindPartOnRay(Ray.new(origin, offset.unit*minDist))
+			local dist = (hit - origin).magnitude
+			if minDist > dist then
+				minDist = dist
+				minVect = offset.unit
+			end
+		end
+	end
+
+	return fz:Dot(minVect)*minDist
+end
+
+------------------------------------------------------------------------
+
+local function StepFreecam(dt)
+	local vel = velSpring:Update(dt, Input.Vel(dt))
+	local pan = panSpring:Update(dt, Input.Pan(dt))
+	local fov = fovSpring:Update(dt, Input.Fov(dt))
+
+	local zoomFactor = sqrt(tan(rad(70/2))/tan(rad(cameraFov/2)))
+
+	cameraFov = clamp(cameraFov + fov*Freecam.FOV_GAIN*(dt/zoomFactor), 1, 120)
+	cameraRot = cameraRot + pan*Freecam.PAN_GAIN*(dt/zoomFactor)
+	cameraRot = Vector2.new(clamp(cameraRot.x, -Freecam.PITCH_LIMIT, Freecam.PITCH_LIMIT), cameraRot.y%(2*pi))
+
+	local cameraCFrame = CFrame.new(cameraPos)*CFrame.fromOrientation(cameraRot.x, cameraRot.y, 0)*CFrame.new(vel*Freecam.NAV_GAIN*dt)
+	cameraPos = cameraCFrame.p
+
+	Camera.CFrame = cameraCFrame
+	Camera.Focus = cameraCFrame*CFrame.new(0, 0, -GetFocusDistance(cameraCFrame))
+	Camera.FieldOfView = cameraFov
+end
+
+------------------------------------------------------------------------
+
+local PlayerState = {} do
+	local mouseBehavior
+	local mouseIconEnabled
+	local cameraType
+	local cameraFocus
+	local cameraCFrame
+	local cameraFieldOfView
+	local screenGuis = {}
+	local coreGuis = {
+		Backpack = true,
+		Chat = true,
+		Health = true,
+		PlayerList = true,
+	}
+	local setCores = {
+		BadgesNotificationsActive = true,
+		PointsNotificationsActive = true,
+	}
+
+	-- Save state and set up for freecam
+	function PlayerState.Push()
+		for name in pairs(coreGuis) do
+			coreGuis[name] = StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType[name])
+			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType[name], false)
+		end
+		for name in pairs(setCores) do
+			setCores[name] = StarterGui:GetCore(name)
+			StarterGui:SetCore(name, false)
+		end
+		local playergui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+		if playergui then
+			for _, gui in pairs(playergui:GetChildren()) do
+				if gui:IsA("ScreenGui") and gui.Enabled then
+					if table.find(Freecam.IgnoreGUI, gui.Name) then continue end
+					screenGuis[#screenGuis + 1] = gui
+					gui.Enabled = false
+				end
+			end
+		end
+
+		cameraFieldOfView = Camera.FieldOfView
+		Camera.FieldOfView = 70
+
+		cameraType = Camera.CameraType
+		Camera.CameraType = Enum.CameraType.Custom
+
+		cameraCFrame = Camera.CFrame
+		cameraFocus = Camera.Focus
+
+		mouseIconEnabled = UserInputService.MouseIconEnabled
+		UserInputService.MouseIconEnabled = false
+
+		mouseBehavior = UserInputService.MouseBehavior
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	end
+
+	-- Restore state
+	function PlayerState.Pop()
+		for name, isEnabled in pairs(coreGuis) do
+			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType[name], isEnabled)
+		end
+		for name, isEnabled in pairs(setCores) do
+			StarterGui:SetCore(name, isEnabled)
+		end
+		for _, gui in pairs(screenGuis) do
+			if gui.Parent then
+				gui.Enabled = true
+			end
+		end
+
+		Camera.FieldOfView = cameraFieldOfView
+		cameraFieldOfView = nil
+
+		Camera.CameraType = cameraType
+		cameraType = nil
+
+		Camera.CFrame = cameraCFrame
+		cameraCFrame = nil
+
+		Camera.Focus = cameraFocus
+		cameraFocus = nil
+
+		UserInputService.MouseIconEnabled = mouseIconEnabled
+		mouseIconEnabled = nil
+
+		UserInputService.MouseBehavior = mouseBehavior
+		mouseBehavior = nil
+	end
+end
+
+------------------------------------------------------------------------
+
+do
+	function Freecam.StartFreecam()
+		local cameraCFrame = Camera.CFrame
+		cameraRot = Vector2.new(cameraCFrame:toEulerAnglesYXZ())
+		cameraPos = cameraCFrame.p
+		cameraFov = Camera.FieldOfView
+
+		velSpring:Reset(Vector3.new())
+		panSpring:Reset(Vector2.new())
+		fovSpring:Reset(0)
+
+		PlayerState.Push()
+		if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and not UserInputService.MouseEnabled
+			and not UserInputService.GamepadEnabled and not GuiService:IsTenFootInterface() then
+			GUI:Show();
+		end
+		RunService:BindToRenderStep("Freecam", Enum.RenderPriority.Camera.Value, StepFreecam)
+		Input.StartCapture()
+	end
+
+	function Freecam.StopFreecam()
+		Input.StopCapture()
+		RunService:UnbindFromRenderStep("Freecam")
+		PlayerState.Pop()
+		if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and not UserInputService.MouseEnabled
+			and not UserInputService.GamepadEnabled and not GuiService:IsTenFootInterface() then
+			GUI:Hide();
+		end
+	end
+	
+	function Freecam.ToggleFreecam()
+		if Freecam.Enabled then Freecam.StopFreecam()
+		else Freecam.StartFreecam() end
+		Freecam.Enabled = not Freecam.Enabled
+	end
+end
+return Freecam
+end)()
 	FreecamModule.IgnoreGUI = {"Radio", "Journal", "MobileUI", "Statusifier"}
 
 	local Light;
@@ -627,7 +1429,7 @@ local Success, Result = pcall(function()
 		if game.Workspace["Ghost"]:WaitForChild("Highlight", 1) then game.Workspace["Ghost"]["Highlight"]:Destroy(); end
 		local Ghost = game.Workspace["Ghost"];
 		GhostESP["Text"] = CreateESP("Text", { Text = "[Ghost]"; Distance = Ghost.PrimaryPart; ParentText = Ghost:WaitForChild("Head"); Color = Color3.fromRGB(255, 0, 0); });
-		GhostESP["Text"] = CreateESP("Highlight", { Parent = Ghost; Color = Color3.fromRGB(255, 0, 0); });
+		GhostESP["Highlight"] = CreateESP("Highlight", { Parent = Ghost; Color = Color3.fromRGB(255, 0, 0); });
 	end
 	for _, player in pairs(Players:GetChildren()) do
 		if player == LocalPlayer then continue; end
@@ -932,7 +1734,7 @@ local Success, Result = pcall(function()
 					end
 					if not Evidences["Ultraviolet"].Visible and #game.Workspace["Map"]["Prints"]:GetChildren() > 0 then
 						for _, prints in pairs(game.Workspace["Map"]["Prints"]:GetChildren()) do
-							if table.find({"Script, LocalScript"}, prints.ClassName) then continue; end
+							if table.find({"Script", "LocalScript"}, prints.ClassName) then continue; end
 							Evidences["Ultraviolet"].Visible = true;
 						end
 					end
@@ -941,7 +1743,7 @@ local Success, Result = pcall(function()
 					end
 					if not Evidences["Ghost Orbs"].Visible and #game.Workspace["Map"]["Orbs"]:GetChildren() > 0 then
 						for _, orbs in pairs(game.Workspace["Map"]["Orbs"]:GetChildren()) do
-							if table.find({"Script, LocalScript"}, orbs.ClassName) then continue; end
+							if table.find({"Script", "LocalScript"}, orbs.ClassName) then continue; end
 							Evidences["Ghost Orbs"].Visible = true;
 						end
 					end
@@ -1066,7 +1868,7 @@ local Success, Result = pcall(function()
 			if iESP["Item"] and iESP["Item"] == item then
 				if not ValidateItemESP(iESP["Item"]) then
 					iESP["ESP"]:Destroy();
-					table.remove(ItemsESP, table.find(iESP));
+					table.remove(ItemsESP, table.find(ItemsESP, iESP));
 				end
 				return;
 			end
@@ -1142,7 +1944,310 @@ local Success, Result = pcall(function()
 	print("Loaded Blair Script!");
 end)
 
-local WebhookModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/MODULES/refs/heads/master/WebhookModule.lua"))();
+local WebhookModule = (function()
+--// WEBHOOK MODULE
+local Webhook = {}
+local Embed = {}
+local Field = {}
+
+-----------------------
+----- [ Webhook ] -----
+-----------------------
+do
+	Webhook.__index = Webhook
+	Webhook.__tostring = function(self)
+		local Data = {}
+		Data["content"] = self["content"]
+
+		if self["username"] ~= "" then Data["username"] = self["username"] end
+		if self["avatar_url"] ~= "" then Data["avatar_url"] = self["avatar_url"] end
+		if #self["embeds"] > 0 then
+			Data["embeds"] = {}
+			for i = 1, #self["embeds"] do
+				Data["embeds"][i] = HttpService:JSONDecode(tostring(self["embeds"][i]))
+			end
+		end
+
+		return HttpService:JSONEncode(Data)
+	end
+
+	function Webhook.new(content, username, avatar_url)
+		local Data = {
+			["avatar_url"] = avatar_url or "",
+			["username"] = username or "",
+			["content"] = content or "",
+			["embeds"] = {},
+		}
+		return setmetatable(Data, Webhook)
+	end
+
+	-----------------------
+	----- [ Methods ] -----
+	-----------------------
+	function Webhook:Append(text)
+		local temp = self["content"] .. text
+		if #temp > 2000 then
+			warn('Message body cannot exceed 2000 characters')
+			return
+		end
+		self["content"] = temp
+	end
+
+	function Webhook:AppendLine(text)
+		self:Append(text .. "\n")
+	end
+
+	function Webhook:SetUsername(username)
+		self["username"] = username
+	end
+
+	function Webhook:SetAvatarUrl(url)
+		self["avatar_url"] = url
+	end
+
+	function Webhook:NewEmbed(...)
+		local embed = Embed.new(...)
+		self["embeds"][#self["embeds"]+1] = embed
+		return embed
+	end
+
+	function Webhook:CountEmbeds()
+		return #self["embeds"]
+	end
+
+	function Webhook:Send(discord_id, webhook_key, thread_id)
+		local headers = { ["content-type"] = "application/json" }
+		local url = ""
+
+		local url = "https://discord.com/api/webhooks/"..discord_id.."/"..webhook_key
+		if thread_id and thread_id ~= "" then url = url.."?"..thread_id end
+
+		local request = http_request or request or HttpPost or syn.request or http.request
+		local hook = { Url = url; Body = tostring(self); Method = "POST"; Headers = headers }
+		warn("Sending webhook notification...")
+		request(hook)
+	end
+end
+
+----------------------
+----- [ Embeds ] -----
+----------------------
+do
+	Embed.__index = Embed
+	Embed.__tostring = function(self)
+		local Data = {}
+
+		if self["title"] ~= "" then Data["title"] = self["title"] end
+		if self["description"] ~= "" then Data["description"] = self["description"] end
+		if Data["color"] ~= 0 then Data["color"] = self["color"] end
+		if self["url"] ~= "" then Data["url"] = self["url"] end
+		if self["timestamp"] ~= 0 then Data["timestamp"] = self["timestamp"] end
+		if self["footer"]["text"] ~= "" or self["footer"]["icon_url"] ~= "" then
+			Data["footer"] = {
+				["text"] = self["footer"]["text"];
+				["icon_url"] = self["footer"]["icon_url"];
+			}
+		end
+		if self["image"]  ~= "" then
+			Data["image"] = {
+				["url"] = self["image"]
+			}
+		end
+		if self["thumbnail"] ~= "" then
+			Data["thumbnail"] = {
+				["url"] = self["thumbnail"]
+			}
+		end
+		if self["author"]["name"] ~= "" then
+			Data["author"] = {
+				["name"] = self["author"]["name"],
+				["url"] = self["author"]["url"],
+				["icon_url"] = self["author"]["icon_url"]
+			}
+		end
+		if #self["fields"] > 0 then
+			Data["fields"] = {}
+			for i = 1, #self["fields"] do
+				Data["fields"][i] = HttpService:JSONDecode(tostring(self["fields"][i]))
+			end
+		end
+
+		return HttpService:JSONEncode(Data)
+	end
+
+	function Embed.new(title, description, url)
+		local Data = {
+			["title"] = title or "";
+			["description"] = description or "";
+			["url"] = url or "";
+			["timestamp"] = 0;
+			["color"] = 0;
+			["footer"] = { ["text"] = ""; ["icon_url"] = ""; };
+			["image"] = "";
+			["thumbnail"] = "";
+			["author"] = { ["name"] = ""; ["url"] = ""; ["icon_url"] = ""; };
+			["fields"] = {};
+		}
+		return setmetatable(Data, Embed)
+	end
+
+	-----------------------
+	----- [ Methods ] -----
+	-----------------------
+	function Embed:SetTitle(title)
+		if #title > 256 then
+			warn('Title cannot exceed 256 characters')
+			return
+		end
+		self["title"] = title
+	end
+
+	function Embed:Append(text)
+		local temp = self["description"] .. text
+		if #temp > 2048 then
+			warn('Append description cannot exceed 2048 characters')
+			return
+		end
+		self["description"] = temp
+	end
+
+	function Embed:AppendLine(text)
+		self:Append(text .. "\n")
+	end
+
+	function Embed:SetURL(url)
+		self["url"] = url
+	end
+
+	function Embed:SetTimestamp(epoch)
+		if epoch == nil then epoch = tick() end
+		local temp = os.date('!*t', epoch)
+		self["timestamp"] = string.format("%d-%02d-%02dT%02d:%02d:%02dZ",
+			temp["year"],
+			temp["month"],
+			temp["day"],
+			temp["hour"],
+			temp["min"],
+			temp["sec"]
+		)
+	end
+
+	function Embed:SetColor(color)
+		if typeof(color) == "Color3" then
+			local value = bit32.lshift(math.floor(color["r"] * 255 + 0.5), 8)
+			value = bit32.lshift(math.floor(color["g"] * 255 + 0.5) + value, 8)
+			value = value + math.floor(color["b"] * 255 + 0.5)
+			self["color"] = value
+		elseif typeof(color) == "number" then
+			self["color"] = color
+		end
+	end
+
+	function Embed:AppendFooter(text)
+		local temp = self["footer"]["text"] .. text
+		if #temp > 2048 then
+			warn('Append footer cannot exceed 2048 characters')
+			return
+		end
+		self["footer"]["text"] = temp
+	end
+
+	function Embed:AppendFooterLine(text)
+		self:AppendFooter(text .. "\n")
+	end
+
+	function Embed:SetFooterIconURL(url)
+		self["footer"]["icon_url"] = url
+	end
+
+	function Embed:SetImageURL(url)
+		self["image"] = url
+	end
+
+	function Embed:SetThumbnailIconURL(url)
+		self["thumbnail"] = url
+	end
+
+	function Embed:SetAuthorName(name)
+		if #name > 256 then
+			warn('Author name cannot exceed 256 characters')
+		end
+		self["author"]["name"] = name
+	end
+
+	function Embed:SetAuthorURL(url)
+		self["author"]["url"] = url
+	end
+
+	function Embed:SetAuthorIconURL(url)
+		self["author"]["icon_url"] = url
+	end
+
+	function Embed:NewField(...)
+		local field = Field.new(...)
+		self["fields"][#self["fields"]+1] = field
+		return field
+	end
+
+	function Embed:CountFields()
+		return #self["fields"]
+	end
+
+end
+
+---------------------
+----- [ Field ] -----
+---------------------
+do
+	Field.__index = Field
+	Field.__tostring = function(self)
+		return HttpService:JSONEncode({
+			["name"] = self["name"];
+			["value"] = self["value"];
+			["inline"] = self["inline"];
+		})
+	end
+
+	function Field.new(name, value, inline)
+		local Data = {
+			["name"] = name or "";
+			["value"] = value or "";
+			["inline"] = inline or false;
+		}
+		return setmetatable(Data, Field)
+	end
+
+	-----------------------
+	----- [ Methods ] -----
+	-----------------------
+	function Field:SetName(name)
+		if #name > 256 then
+			warn('Name must not exceed 256 characters')
+			return
+		end
+		self["name"] = name
+	end
+
+	function Field:Append(text)
+		local temp = self["value"] .. text
+		if #temp > 1024 then
+			warn('Field content cannot exceed 1024 characters')
+			return
+		end
+		self["value"] = temp
+	end
+
+	function Field:AppendLine(text)
+		self:Append(text .. "\n")
+	end
+
+	function Field:SetIsInLine(inline)
+		self["inline"] = inline
+	end
+
+end
+return Webhook
+end)()
 local Webhook = WebhookModule.new();
 local Embed = Webhook:NewEmbed(game.Players.LocalPlayer.Name.." ("..game.Players.LocalPlayer.UserId..")");
 if Success then
