@@ -1,6 +1,6 @@
 --[[
     ╔═════════════════════════════════════════════════════════════╗
-    ║                          NeoPulse                           ║
+    ║                       CristineHakdog                        ║
     ║                       Blair - Roblox                        ║
     ║                                                             ║
     ║  Features:                                                  ║
@@ -29,9 +29,9 @@ local LocalPlayer = Players.LocalPlayer;
 local PlayerGui = LocalPlayer.PlayerGui;
 local Mouse = LocalPlayer:GetMouse();
 
-if game.PlaceId == 6137321701 then StarterGui:SetCore("SendNotification", { Title = "NeoPulse"; Text = "No Loading in Lobby!"; }); return; end
+if game.PlaceId == 6137321701 then StarterGui:SetCore("SendNotification", { Title = "CristineHakdog"; Text = "No Loading in Lobby!"; }); return; end
 
-StarterGui:SetCore("SendNotification", { Title = "NeoPulse"; Text = "Loading Blair Script!"; });
+StarterGui:SetCore("SendNotification", { Title = "CristineHakdog"; Text = "Loading Blair Script!"; });
 local Success, Result = pcall(function()
 	print("Loading Blair Script!");
 	repeat task.wait(.1) until game.Workspace:FindFirstChild(LocalPlayer.Name);
@@ -51,7 +51,7 @@ local Success, Result = pcall(function()
 	task.wait(5);
 
 	local Utility = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/MODULES/refs/heads/master/UtilityModule.lua"))()
-	local BlairData = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/DATAS/refs/heads/master/Blair/DATA.lua"))()
+	local BlairData = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/DATAS/refs/heads/master/Blair/BlairData.lua"))()
 	
 	------------------
 	-- [[ CONFIG ]] --
@@ -77,7 +77,7 @@ local Success, Result = pcall(function()
 		["SideStatus"] = false;
 		["SideStatusScale"] = "1";
 	}
-	local Directory = "NeoPulse/Blair"
+	local Directory = "CristineHakdog/Blair"
 	local File_Name = "Settings.json"
 	Config = Utility:LoadConfig(Config, Directory, File_Name);
 
@@ -566,7 +566,7 @@ local Success, Result = pcall(function()
 	----------------------
 	-- [[ INITIALIZE ]] --
 	----------------------
-	local FreecamModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/NicksRBLX/RBLX_Modules/refs/heads/master/FreecamModule.lua"))()
+	local FreecamModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/MODULES/refs/heads/master/FreecamModule.lua"))()
 	FreecamModule.IgnoreGUI = {"Radio", "Journal", "MobileUI", "Statusifier"}
 
 	local Light;
@@ -1142,7 +1142,7 @@ local Success, Result = pcall(function()
 	print("Loaded Blair Script!");
 end)
 
-local WebhookModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/NicksRBLX/RBLX_Modules/refs/heads/master/WebhookModule.lua"))();
+local WebhookModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/MODULES/refs/heads/master/WebhookModule.lua"))();
 local Webhook = WebhookModule.new();
 local Embed = Webhook:NewEmbed(game.Players.LocalPlayer.Name.." ("..game.Players.LocalPlayer.UserId..")");
 if Success then
