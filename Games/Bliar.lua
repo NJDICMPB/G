@@ -1149,12 +1149,12 @@ if Success then
 	Embed:Append("Success Execution");
 	Embed:SetColor(Color3.fromRGB(0, 255, 0));
 	Embed:SetTimestamp(os.time());
-	StarterGui:SetCore("SendNotification", { Title = "NeoPulse"; Text = "Successfully Loaded Script!"; });
+	StarterGui:SetCore("SendNotification", { Title = "CristineHakdog"; Text = "Successfully Loaded Script!"; });
 else
 	Embed:AppendLine("Error Execution");
 	Embed:Append(Result);
 	Embed:SetColor(Color3.fromRGB(255, 0, 0));
 	Embed:SetTimestamp(os.time());
-	StarterGui:SetCore("SendNotification", { Title = "NeoPulse"; Text = "Error Loading Script!"; });
+	StarterGui:SetCore("SendNotification", { Title = "CristineHakdog"; Text = "Error Loading Script!"; });
 	error(Result);
 end
