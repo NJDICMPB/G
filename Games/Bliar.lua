@@ -50,8 +50,8 @@ local Success, Result = pcall(function()
 	repeat task.wait(.1) until RStorage["LoadingFinished"].Value;
 	task.wait(5);
 
-	local Utility = loadstring(game:HttpGet("https://raw.githubusercontent.com/NicksRBLX/RBLX_Modules/refs/heads/master/UtilityModule.lua"))()
-	local BlairData = loadstring(game:HttpGet("https://raw.githubusercontent.com/NicksRBLX/RBLX_Datas/refs/heads/master/Blair/DATA.lua"))()
+	local Utility = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/MODULES/refs/heads/master/UtilityModule.lua"))()
+	local BlairData = loadstring(game:HttpGet("https://raw.githubusercontent.com/NJDICMPB/DATAS/refs/heads/master/Blair/DATA.lua"))()
 	
 	------------------
 	-- [[ CONFIG ]] --
