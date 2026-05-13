@@ -5,7 +5,7 @@
     ║                                                             ║
     ║  Features:                                                  ║
     ║    • 	Ghost ESP, Object ESP, Items ESP, Room ESP            ║
-	  ║    • 	Speed Hack (Toggle)                                   ║
+	║    • 	Speed Hack (Toggle)                                   ║
     ║    • 	Ghost Informations                                    ║
     ╚═════════════════════════════════════════════════════════════╝
 --]]
